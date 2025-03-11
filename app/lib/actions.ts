@@ -88,7 +88,7 @@ export async function updateInvoice(
 
   const { customerId, amount, status } = validatedFields.data;
   const amountInCents = amount * 100;
-  
+
   try {
     await sql`
       UPDATE invoices
@@ -129,4 +129,86 @@ export async function authenticate(
     }
     throw error;
   }
+}
+
+const CustomerSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  email: z.string().email("Invalid email"),
+  image_url: z.string().url("Invalid URL"),
+});
+
+export async function createCustomer(
+  prevState: unknown,
+  formData: FormData
+): Promise<void | { errors: Record<string, string[]>; message: string }> {
+  const validatedFields = CustomerSchema.safeParse({
+    name: formData.get("name"),
+    email: formData.get("email"),
+    image_url: formData.get("image_url"),
+  });
+
+  if (!validatedFields.success) {
+    return {
+      errors: validatedFields.error.flatten().fieldErrors,
+      message: "Invalid input. Failed to create customer.",
+    };
+  }
+
+  const { name, email, image_url } = validatedFields.data;
+
+  try {
+    await sql`
+      INSERT INTO customers (name, email, image_url)
+      VALUES (${name}, ${email}, ${image_url})
+    `;
+  } catch (error) {
+    console.error("Error creating customer:", error);
+  }
+
+  revalidatePath("/dashboard/customers");
+  redirect("/dashboard/customers");
+}
+
+export async function updateCustomer(
+  id: string,
+  prevState: unknown,
+  formData: FormData
+): Promise<void | { errors: Record<string, string[]>; message: string }> {
+  const validatedFields = CustomerSchema.safeParse({
+    name: formData.get("name"),
+    email: formData.get("email"),
+    image_url: formData.get("image_url"),
+  });
+
+  if (!validatedFields.success) {
+    return {
+      errors: validatedFields.error.flatten().fieldErrors,
+      message: "Invalid input. Failed to update customer.",
+    };
+  }
+
+  const { name, email, image_url } = validatedFields.data;
+
+  try {
+    await sql`
+      UPDATE customers
+      SET name = ${name}, email = ${email}, image_url = ${image_url}
+      WHERE id = ${id}
+    `;
+  } catch (error) {
+    console.error(`Error updating customer with id ${id}:`, error);
+  }
+
+  revalidatePath("/dashboard/customers");
+  redirect("/dashboard/customers");
+}
+
+export async function deleteCustomer(id: string): Promise<void> {
+  try {
+    await sql`DELETE FROM customers WHERE id = ${id}`;
+  } catch (error) {
+    console.error(`Error deleting customer with id ${id}:`, error);
+  }
+
+  revalidatePath("/dashboard/customers");
 }
